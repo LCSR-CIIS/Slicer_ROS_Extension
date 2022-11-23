@@ -37,6 +37,7 @@
 #include <vtkOBJReader.h>
 #include <vtkPLYReader.h>
 #include <vtkTransformPolyDataFilter.h>
+#include <vtkSphereSource.h>
 
 // STD includes
 #include <cstdlib>
@@ -85,6 +86,8 @@ public:
   vtkSmartPointer<vtkPolyData> ReadPolyData(const char* fileName);
   //Function to get vtk transform matrix from tf transform
   vtkSmartPointer<vtkMatrix4x4>GetMatrixFromTFtransform(tf::StampedTransform transform);
+  //Function to get link geometry and link offset
+  void getLinkGeometryAndOffset(urdf::LinkSharedPtr & link, urdf::GeometrySharedPtr & geometry, double* offsetXYZ, double* offsetRPY);
   
 
 

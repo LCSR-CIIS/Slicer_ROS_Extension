@@ -24,6 +24,7 @@
 #include <vtkMRMLModelDisplayNode.h>
 #include <vtkMRMLLinearTransformNode.h>
 
+
 // STD includes
 #include <cassert>
 
@@ -155,24 +156,8 @@ void vtkSlicerROS1_ModuleLogic::LoadURDFModelToScene(){
     //Link offset XYZ and RPY
     double offsetXYZ[3];
     double offsetRPY[3];
-    if(it->second->collision != NULL ){
-      geometry = it->second->collision->geometry;
-      offsetXYZ[0] = it->second->collision->origin.position.x;
-      offsetXYZ[1] = it->second->collision->origin.position.y;
-      offsetXYZ[2] = it->second->collision->origin.position.z;
-      it->second->collision->origin.rotation.getRPY(offsetRPY[0], offsetRPY[1], offsetRPY[2]);
-    }else{
-      //If no collision geometry, use visual geometry
-      if(it->second->visual != NULL){
-        geometry = it->second->visual->geometry;
-        offsetXYZ[0] = it->second->visual->origin.position.x;
-        offsetXYZ[1] = it->second->visual->origin.position.y;
-        offsetXYZ[2] = it->second->visual->origin.position.z;
-        it->second->visual->origin.rotation.getRPY(offsetRPY[0], offsetRPY[1], offsetRPY[2]);
-      }else{
-        geometry = NULL;
-      }
-    }
+    //Get link geometry and offset
+    getLinkGeometryAndOffset(it->second, geometry, offsetXYZ, offsetRPY);
     //Check if geometry is NULL
     if (geometry == NULL){
       std::cout<<"No geometry found for link: "<<it->first<<std::endl;
@@ -181,14 +166,18 @@ void vtkSlicerROS1_ModuleLogic::LoadURDFModelToScene(){
     urdf::MeshSharedPtr mesh = boost::dynamic_pointer_cast<urdf::Mesh>(geometry);
     //Print mesh filename
     std::cout<<"Mesh filename: "<<mesh->filename<<std::endl;
-    //Get package name from urdf
-    std::string packagePath = "/home/hongyi/catkin_ws/src/universal_robot/";
-    //if contains "package://" prefix, remove it
+    //Full path to mesh file
+    std::string meshPath;
+    //if contains "package://" prefix, get full path
     if(mesh->filename.find("package://") != std::string::npos){
-      mesh->filename.erase(0,10);
+      std::string packageName = mesh->filename.substr(10, mesh->filename.find("/", 10) - 10);//get package name
+      std::string packagePath = ros::package::getPath(packageName);//get package path
+      meshPath = packagePath + "/" + mesh->filename.substr(mesh->filename.find("/", 10) + 1);//get full path to mesh file
+    }else{
+      //if not, use the full path
+      meshPath = mesh->filename;
     }
-    //Get full path of mesh file
-    std::string meshPath = packagePath + mesh->filename;
+   
     //print mesh path
     std::cout<<"Mesh path: "<<meshPath<<std::endl;
     //Get polydata from mesh file
@@ -281,12 +270,12 @@ vtkSmartPointer<vtkPolyData> vtkSlicerROS1_ModuleLogic::ReadPolyData(const char*
   else
   {
     vtkErrorMacro("File type not recognized: " << fileName << " only .stl, .STL, .obj, and .OBJ files are supported. Using dummy mesh instead.");
-    //Load a dummy mesh
-    std::string dummyMeshFileName = "/home/hongyi/SlicerROSExtension-debug/ROS1_Module/Resources/dummy.STL";
-    vtkSmartPointer<vtkSTLReader> reader = vtkSmartPointer<vtkSTLReader>::New();
-    reader->SetFileName(dummyMeshFileName.c_str());
-    reader->Update();
-    polyData = reader->GetOutput();
+    //Create a sphere dummy mesh
+    vtkSmartPointer<vtkSphereSource> sphereSource = vtkSmartPointer<vtkSphereSource>::New();
+    sphereSource->SetCenter(0.0, 0.0, 0.0);
+    sphereSource->SetRadius(50.0);
+    sphereSource->Update();
+    polyData = sphereSource->GetOutput();
   }
   //Convert units from meters to millimeters
   vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
@@ -315,4 +304,25 @@ vtkSmartPointer<vtkMatrix4x4> vtkSlicerROS1_ModuleLogic::GetMatrixFromTFtransfor
   matrix->SetElement(2,2,transform.getBasis()[2][2]);
   matrix->SetElement(2,3,transform.getOrigin()[2] * M_TO_MM);
   return matrix;
+}
+
+void vtkSlicerROS1_ModuleLogic::getLinkGeometryAndOffset(urdf::LinkSharedPtr & link, urdf::GeometrySharedPtr & geometry, double* offsetXYZ, double* offsetRPY){
+  if(link->collision != NULL ){
+      geometry = link->collision->geometry;
+      offsetXYZ[0] = link->collision->origin.position.x;
+      offsetXYZ[1] = link->collision->origin.position.y;
+      offsetXYZ[2] = link->collision->origin.position.z;
+      link->collision->origin.rotation.getRPY(offsetRPY[0], offsetRPY[1], offsetRPY[2]);
+    }else{
+      //If no collision geometry, use visual geometry
+      if(link->visual != NULL){
+        geometry = link->visual->geometry;
+        offsetXYZ[0] = link->visual->origin.position.x;
+        offsetXYZ[1] = link->visual->origin.position.y;
+        offsetXYZ[2] = link->visual->origin.position.z;
+        link->visual->origin.rotation.getRPY(offsetRPY[0], offsetRPY[1], offsetRPY[2]);
+      }else{
+        geometry = NULL;
+      }
+    }
 }
