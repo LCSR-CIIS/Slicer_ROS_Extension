@@ -37,6 +37,7 @@
 //Boost include
 #include <boost/pointer_cast.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/algorithm/string.hpp>
 
 #define M_TO_MM 1000.0
 #define RAD_TO_DEG 180.0/M_PI
@@ -60,7 +61,6 @@ vtkSlicerROS1_ModuleLogic::vtkSlicerROS1_ModuleLogic()
   //ROS Subscriber 
   slicerSub = slicerROSnodePtr->subscribe("joint_states", 1000, &vtkSlicerROS1_ModuleLogic::slicerSubCallback, this);
   int counter = 0;
-  ROS_INFO("Node and publisher created, now publishing data");
   //Load URDF from parameter server
   if (!m_urdfModel.initParam("robot_description"))
   {
@@ -69,6 +69,14 @@ vtkSlicerROS1_ModuleLogic::vtkSlicerROS1_ModuleLogic()
     std::cout<<"URDF loaded"<<std::endl;
     std::cout<<"Robot name is: "<<m_urdfModel.getName()<<std::endl;
   }
+  //Check if has AMBF in ROS Parameters
+  if(slicerROSnodePtr->hasParam("/ambf/rigid_body_mesh_path_map")){
+    std::cout<<"Connected to AMBF"<<std::endl;
+    std::string AMBF_Mesh_Paths;
+    slicerROSnodePtr->getParam("/ambf/rigid_body_mesh_path_map",AMBF_Mesh_Paths);
+    LoadAMBFBodyMeshMap(AMBF_Mesh_Paths);
+  }
+  
   //Initialize tfListener
   m_tfListener_ptr = new tf::TransformListener();
 }
@@ -108,6 +116,7 @@ void vtkSlicerROS1_ModuleLogic::RegisterNodes()
   assert(this->GetMRMLScene() != 0);
   std::cout<<"Node Registered"<<std::endl;
   LoadURDFModelToScene();
+  LoadAMBFModelToScene();
 }
 
 //---------------------------------------------------------------------------
@@ -215,6 +224,42 @@ void vtkSlicerROS1_ModuleLogic::LoadURDFModelToScene(){
     //add model node to model node vector
     m_modelNodes.push_back(m.GetPointer());
   }
+}
+
+void vtkSlicerROS1_ModuleLogic::LoadAMBFModelToScene(){
+  //Create model node for each rigidbody in ambf mesh map
+  for (auto it = m_ambfBodyMeshMap.begin(); it != m_ambfBodyMeshMap.end(); it++)
+  {
+    std::cout<<"Link name: "<<it->first<<std::endl;
+    //Get mesh path
+    std::string meshPath = it->second;
+    //print mesh path
+    std::cout<<"Mesh path: "<<meshPath<<std::endl;
+    //Get polydata from mesh file
+    vtkSmartPointer<vtkPolyData> polyData = ReadPolyData(meshPath.c_str());
+    //Set mesh to model node
+    vtkNew<vtkMRMLModelNode> m;
+    m->SetAndObservePolyData(polyData);
+    //Set model node name
+    m->SetName(it->first.c_str());
+    //Set model node display node
+    if (m->GetDisplayNodeID() == NULL){
+      vtkNew<vtkMRMLModelDisplayNode> dnode;
+      this->GetMRMLScene()->AddNode(dnode.GetPointer());
+      dnode->SetName((it->first+"_display").c_str());
+      m->SetAndObserveDisplayNodeID(dnode->GetID());
+    }
+    //Add model node and display node to scene
+    if(this->GetMRMLScene() != NULL){
+      this->GetMRMLScene()->AddNode(m.GetPointer());
+      std::cout << "Model node added to scene" << std::endl;
+    }else{
+      std::cout<<"MRML Scene is NULL"<<std::endl;
+    }
+    //add model node to model node vector
+    m_modelNodes.push_back(m.GetPointer());
+  }
+
 }
 
 //Update model pose
@@ -326,3 +371,20 @@ void vtkSlicerROS1_ModuleLogic::getLinkGeometryAndOffset(urdf::LinkSharedPtr & l
       }
     }
 }
+
+void vtkSlicerROS1_ModuleLogic::LoadAMBFBodyMeshMap(std::string ambfBodyMeshMapParam){
+  //Different rigidbodies are separated by semi-colons, and the name of the rigidbody and the path to the mesh are separated by a colon
+  //Boost Split the string by semi-colons
+  std::vector<std::string> ambfBodyMeshMapVector;
+  boost::split(ambfBodyMeshMapVector, ambfBodyMeshMapParam, boost::is_any_of(";"));
+  //Loop through the vector and split each element by the colon
+  for(int i = 0; i < ambfBodyMeshMapVector.size(); i++){
+    std::vector<std::string> ambfBodyMeshMapElementVector;
+    boost::split(ambfBodyMeshMapElementVector, ambfBodyMeshMapVector[i], boost::is_any_of(":"));
+    //If the element vector has two elements, then the first element is the name of the rigidbody and the second element is the path to the mesh
+    if(ambfBodyMeshMapElementVector.size() == 2){
+      this->m_ambfBodyMeshMap[ambfBodyMeshMapElementVector[0]] = ambfBodyMeshMapElementVector[1];
+    }
+  }
+}
+

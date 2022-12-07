@@ -76,10 +76,14 @@ public:
   void slicerSubCallback(const std_msgs::Int64::ConstPtr& msg);
   //URDF model
   urdf::Model m_urdfModel;
+  //Map for storing AMBF body names and their mesh file names
+  std::map<std::string, std::string> m_ambfBodyMeshMap;
   //MRML Model Node vector
   std::vector<vtkMRMLModelNode*> m_modelNodes;
   //Function to load URDF model to scene
   void LoadURDFModelToScene();
+  //Function to load AMBF model to scene
+  void LoadAMBFModelToScene();
   //Function to update URDF model in scene
   void UpdateRobotModel();
   //Function that converts STL, DAE or OBJ files to VTK PolyData
@@ -88,7 +92,8 @@ public:
   vtkSmartPointer<vtkMatrix4x4>GetMatrixFromTFtransform(tf::StampedTransform transform);
   //Function to get link geometry and link offset
   void getLinkGeometryAndOffset(urdf::LinkSharedPtr & link, urdf::GeometrySharedPtr & geometry, double* offsetXYZ, double* offsetRPY);
-  
+  //Function to Load AMBF rigid body and Mesh map
+  void LoadAMBFBodyMeshMap(std::string ambfBodyMeshMapParam);
 
 
 protected:
