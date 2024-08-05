@@ -29,3 +29,18 @@ See build instructions [Here](https://slicer.readthedocs.io/en/latest/developer_
 git clone https://github.com/LCSR-CIIS/Slicer_ROS_Extension.git
 cd 
 ```
+
+---
+
+If you find this repository useful, please cite:
+
+```bibtex
+@article{sahu2024entri,
+  title={Enhanced Navigational Toolkit for Robotic Interventions},
+  author={Sahu, Manish and Ishida, Hisashi and Connolly, Laura and Fan, Hongyi and Deguet, Anton and Kazanzides, Peter and Creighton, Francis X and Taylor, Russell H and Munawar, Adnan},
+  journal={arXiv preprint arXiv:2401.11715},
+  year={2024}
+}
+```
+    
+---
